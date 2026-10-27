@@ -8,7 +8,7 @@
  * Recursive `#` targets and external-package targets remain explicit unknowns.
  */
 
-import { matchPackagePatternKey } from "./javascriptPackagePatternKeys.js";
+import { selectPackageSubpathPattern } from "./javascriptPackageSubpathPatterns.js";
 
 /** How one `#` specifier participates in import-alias lookup. */
 export type PackageImportSpecifierClassification =
@@ -20,10 +20,6 @@ export type PackageImportExactLookup =
   | { readonly kind: "undefined-map" }
   | {
       readonly kind: "missing-key";
-      readonly declared: readonly string[];
-    }
-  | {
-      readonly kind: "pattern-unresolved";
       readonly declared: readonly string[];
     }
   | {
@@ -68,10 +64,8 @@ export const isPackageImportPatternKey = (key: string): boolean =>
  * in Node's pattern-key order and a match returns the pattern target with its
  * captured substring. Keys without a `#` prefix participate too: real Node
  * 22, 24, and 26 follow `imports: {"*": "./safe.js"}` for `#foo`, so the
- * prefix is not a precondition for matching. A miss is reported as missing
- * when every declared key is also exact; if the map contains pattern keys,
- * the miss stays pattern-unresolved rather than claiming the specifier is
- * undefined.
+ * prefix is not a precondition for matching. A request no pattern matches is reported as missing, so unrelated
+ * patterns do not create uncertainty about an undefined specifier.
  */
 export const lookupExactPackageImport = (
   imports: unknown,
@@ -86,7 +80,7 @@ export const lookupExactPackageImport = (
       target: Reflect.get(imports, key),
       declared,
     };
-  const pattern = matchPackagePatternKey(
+  const pattern = selectPackageSubpathPattern(
     declared.filter(isPackageImportPatternKey),
     key,
   );
@@ -97,9 +91,7 @@ export const lookupExactPackageImport = (
       capture: pattern.capture,
       declared,
     };
-  return declared.some(isPackageImportPatternKey)
-    ? { kind: "pattern-unresolved", declared }
-    : { kind: "missing-key", declared };
+  return { kind: "missing-key", declared };
 };
 
 /**
